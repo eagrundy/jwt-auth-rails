@@ -1,5 +1,15 @@
 class ApplicationController < ActionController::API
-  before_action :authorized
+  before_action :authorized, only: [:create]
+
+  def create
+    @user = User.create(user_params)
+    if @user.valid?
+      @token = encode_token(user_id: @user.id)
+      render json: { user: UserSerializer.new(@user), jwt: @token }, status: :created
+    else
+      render json: { error: 'failed to create user' }, status: :not_acceptable
+    end
+  end
 
   def encode_token(payload) #{ user_id: 2 }
     JWT.encode(payload, 'my_s3cr3t') #issue a token, store payload in token
@@ -25,8 +35,6 @@ class ApplicationController < ActionController::API
     if decoded_token()
       user_id = decoded_token[0]['user_id'] #[{ "user_id"=>"2" }, { "alg"=>"HS256" }]
       @user = User.find_by(id: user_id)
-    else
-      nil
     end
   end
 
@@ -36,5 +44,9 @@ class ApplicationController < ActionController::API
 
   def authorized
     render json: { message: 'Please log in' }, status: :unauthorized unless logged_in?
+  end
+
+  def user_params
+    params.require(:user).permit(:username, :password, :bio, :avatar)
   end
 end
